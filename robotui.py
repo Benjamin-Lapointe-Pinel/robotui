@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+import threading
+import serial
 import urwid
 
 class Prompt(urwid.Edit):
@@ -17,7 +19,13 @@ def unhandled_input(key):
         raise urwid.ExitMainLoop()
 
 def on_prompt_command(prompt, command):
-    log.set_text(log.get_text()[0] + command)
+    serial.write(command.encode())
+
+def handle_serial(loop, serial):
+    while serial.inWaiting() > 0:
+        reading = serial.readline().decode()
+        log.set_text(log.get_text()[0] + reading)
+    loop.set_alarm_in(0.5, handle_serial, serial)
 
 if __name__ == "__main__":
     header = urwid.Text('Robot')
@@ -27,9 +35,15 @@ if __name__ == "__main__":
     log_widget = urwid.LineBox(log_widget, 'Log', 'left')
 
     prompt = Prompt(' > ', multiline=True, wrap='ellipsis')
-    urwid.connect_signal(prompt, 'command', on_prompt_command)
+    #urwid.connect_signal(prompt, 'command', on_prompt_command)
     prompt = urwid.LineBox(prompt)
 
     layout = urwid.Pile([log_widget, ('pack', prompt)])
     main_loop = urwid.MainLoop(layout, unhandled_input=unhandled_input)
+
+    serial = serial.Serial('/dev/serial0');
+    handle_serial(main_loop, serial)
+
     main_loop.run()
+
+    serial.close()
